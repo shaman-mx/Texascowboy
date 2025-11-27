@@ -3,6 +3,7 @@ import os
 import json
 import datetime
 import uuid
+from git_push import push_async
 from collections import Counter
 from typing import Optional, Iterable, List, Tuple
 from markupsafe import Markup, escape
@@ -526,6 +527,8 @@ def save_round():
 
     save_data(data)
     save_hour_data(hour_data)
+    if os.environ.get("ENABLE_GIT_PUSH", "false").lower() == "true":
+        push_async(["data.json", "hour.json"], commit_message="Update data/hour from Render")
     flash("Lưu thành công.", "success")
     return redirect(url_for("index"))
 
