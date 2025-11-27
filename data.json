@@ -10320,5 +10320,117 @@
       "suited_combo",
       "trips"
     ]
+  },
+  {
+    "round_id": "3679c39a-6c9d-476a-9f56-027dc539e6c2",
+    "first_card": "Ac",
+    "selected_boxes": [
+      "cowboy_win",
+      "suited_combo",
+      "pair_any",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "7db973ff-6725-4c83-bce6-e11661e3f8f5",
+    "first_card": "4c",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "382ea614-db95-4ab7-9a99-848e607ffdcc",
+    "first_card": "7s",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "0bbb67bd-e13a-4429-b377-b5afeeec33d2",
+    "first_card": "Qh",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "80c38d47-514f-44ec-93e0-2caff2d40bb9",
+    "first_card": "Qs",
+    "selected_boxes": [
+      "bull_win",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "715f594b-a7ef-4e9d-a29c-97802366f7d8",
+    "first_card": "3d",
+    "selected_boxes": [
+      "bull_win",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "ab7ccb3d-23d2-4688-a01c-59cad6df4c4b",
+    "first_card": "4h",
+    "selected_boxes": [
+      "cowboy_win",
+      "pair_any",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "83eced3d-d896-44ea-b6db-0ed48df034bf",
+    "first_card": "6h",
+    "selected_boxes": [
+      "bull_win",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "31e860c5-f336-4760-8b25-fec35d7dcb70",
+    "first_card": "8d",
+    "selected_boxes": [
+      "bull_win",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "73bbb978-9725-4ef2-b9c1-a1fe6a656837",
+    "first_card": "3h",
+    "selected_boxes": [
+      "cowboy_win",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "2147dbd5-3f47-4980-885a-c9cda613629b",
+    "first_card": "4d",
+    "selected_boxes": [
+      "cowboy_win",
+      "pair_any",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "ee37e8d2-ae3e-4712-94ea-9121f5715aba",
+    "first_card": "Ts",
+    "selected_boxes": [
+      "cowboy_win",
+      "suited_combo",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "bd94b2e1-9283-4ed8-955a-84a7655aeaa1",
+    "first_card": "6h",
+    "selected_boxes": [
+      "bull_win",
+      "trips"
+    ]
   }
 ]
