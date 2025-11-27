@@ -1,0 +1,137 @@
+main
+On branch main
+nothing to commit, working tree clean
+04:15:55.172293 git.c:476               trace: built-in: git push -u origin main
+04:15:55.172663 run-command.c:673       trace: run_command: GIT_DIR=.git git remote-https origin https://github.com/shaman-mx/Texascowboy.git
+04:15:55.172692 run-command.c:765       trace: start_command: /nix/store/v2rxk9xkcxsas64wl7ds31al15cm2wqd-git-2.50.1/libexec/git-core/git remote-https origin https://github.com/shaman-mx/Texascowboy.git
+04:15:55.176800 git.c:773               trace: exec: git-remote-https origin https://github.com/shaman-mx/Texascowboy.git
+04:15:55.176832 run-command.c:673       trace: run_command: git-remote-https origin https://github.com/shaman-mx/Texascowboy.git
+04:15:55.176850 run-command.c:765       trace: start_command: /nix/store/v2rxk9xkcxsas64wl7ds31al15cm2wqd-git-2.50.1/libexec/git-core/git-remote-https origin https://github.com/shaman-mx/Texascowboy.git
+04:15:55.252491 http.c:889              == Info: Couldn't find host github.com in the .netrc file; using defaults
+04:15:55.258626 http.c:889              == Info: Host github.com:443 was resolved.
+04:15:55.258646 http.c:889              == Info: IPv6: (none)
+04:15:55.258648 http.c:889              == Info: IPv4: 20.207.73.82
+04:15:55.258673 http.c:889              == Info:   Trying 20.207.73.82:443...
+04:15:55.265951 http.c:889              == Info: ALPN: curl offers h2,http/1.1
+04:15:55.266071 http.c:889              == Info: TLSv1.3 (OUT), TLS handshake, Client hello (1):
+04:15:55.277011 http.c:889              == Info: TLSv1.3 (IN), TLS handshake, Server hello (2):
+04:15:55.278324 http.c:889              == Info: TLSv1.3 (IN), TLS change cipher, Change cipher spec (1):
+04:15:55.278379 http.c:889              == Info: TLSv1.3 (IN), TLS handshake, Encrypted Extensions (8):
+04:15:55.278394 http.c:889              == Info: TLSv1.3 (IN), TLS handshake, Certificate (11):
+04:15:55.282735 http.c:889              == Info: TLSv1.3 (IN), TLS handshake, CERT verify (15):
+04:15:55.283242 http.c:889              == Info: TLSv1.3 (IN), TLS handshake, Finished (20):
+04:15:55.283486 http.c:889              == Info: TLSv1.3 (OUT), TLS change cipher, Change cipher spec (1):
+04:15:55.283634 http.c:889              == Info: TLSv1.3 (OUT), TLS handshake, Finished (20):
+04:15:55.283807 http.c:889              == Info: SSL connection using TLSv1.3 / TLS_AES_128_GCM_SHA256 / x25519 / id-ecPublicKey
+04:15:55.283947 http.c:889              == Info: ALPN: server accepted h2
+04:15:55.284076 http.c:889              == Info: Server certificate:
+04:15:55.284084 http.c:889              == Info:  subject: CN=github.com
+04:15:55.284089 http.c:889              == Info:  start date: Feb  5 00:00:00 2025 GMT
+04:15:55.284092 http.c:889              == Info:  expire date: Feb  5 23:59:59 2026 GMT
+04:15:55.284101 http.c:889              == Info:  subjectAltName: host "github.com" matched cert's "github.com"
+04:15:55.284110 http.c:889              == Info:  issuer: C=GB; ST=Greater Manchester; L=Salford; O=Sectigo Limited; CN=Sectigo ECC Domain Validation Secure Server CA
+04:15:55.284113 http.c:889              == Info:  SSL certificate verify ok.
+04:15:55.284120 http.c:889              == Info:   Certificate level 0: Public key type EC/prime256v1 (256/128 Bits/secBits), signed using ecdsa-with-SHA256
+04:15:55.284124 http.c:889              == Info:   Certificate level 1: Public key type EC/prime256v1 (256/128 Bits/secBits), signed using ecdsa-with-SHA384
+04:15:55.284128 http.c:889              == Info:   Certificate level 2: Public key type EC/secp384r1 (384/192 Bits/secBits), signed using ecdsa-with-SHA384
+04:15:55.284272 http.c:889              == Info: Connected to github.com (20.207.73.82) port 443
+04:15:55.284275 http.c:889              == Info: using HTTP/2
+04:15:55.284302 http.c:889              == Info: [HTTP/2] [1] OPENED stream for https://github.com/shaman-mx/Texascowboy.git/info/refs?service=git-receive-pack
+04:15:55.284530 http.c:889              == Info: [HTTP/2] [1] [:method: GET]
+04:15:55.284634 http.c:889              == Info: [HTTP/2] [1] [:scheme: https]
+04:15:55.284637 http.c:889              == Info: [HTTP/2] [1] [:authority: github.com]
+04:15:55.284639 http.c:889              == Info: [HTTP/2] [1] [:path: /shaman-mx/Texascowboy.git/info/refs?service=git-receive-pack]
+04:15:55.284641 http.c:889              == Info: [HTTP/2] [1] [user-agent: git/2.50.1]
+04:15:55.284643 http.c:889              == Info: [HTTP/2] [1] [accept: */*]
+04:15:55.284645 http.c:889              == Info: [HTTP/2] [1] [accept-encoding: deflate, gzip, br, zstd]
+04:15:55.284647 http.c:889              == Info: [HTTP/2] [1] [accept-language: en-US, *;q=0.9]
+04:15:55.284649 http.c:889              == Info: [HTTP/2] [1] [pragma: no-cache]
+04:15:55.284857 http.c:836              => Send header, 0000000224 bytes (0x000000e0)
+04:15:55.284863 http.c:848              => Send header: GET /shaman-mx/Texascowboy.git/info/refs?service=git-receive-pack HTTP/2
+04:15:55.284865 http.c:848              => Send header: Host: github.com
+04:15:55.284867 http.c:848              => Send header: User-Agent: git/2.50.1
+04:15:55.284868 http.c:848              => Send header: Accept: */*
+04:15:55.284870 http.c:848              => Send header: Accept-Encoding: deflate, gzip, br, zstd
+04:15:55.284871 http.c:848              => Send header: Accept-Language: en-US, *;q=0.9
+04:15:55.284873 http.c:848              => Send header: Pragma: no-cache
+04:15:55.284874 http.c:848              => Send header:
+04:15:55.285073 http.c:889              == Info: Request completely sent off
+04:15:55.289326 http.c:889              == Info: TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+04:15:55.289445 http.c:889              == Info: TLSv1.3 (IN), TLS handshake, Newsession Ticket (4):
+04:15:55.485698 http.c:836              <= Recv header, 0000000013 bytes (0x0000000d)
+04:15:55.486019 http.c:848              <= Recv header: HTTP/2 401
+04:15:55.486035 http.c:836              <= Recv header, 0000000026 bytes (0x0000001a)
+04:15:55.486038 http.c:848              <= Recv header: server: GitHub-Babel/3.0
+04:15:55.486045 http.c:836              <= Recv header, 0000000054 bytes (0x00000036)
+04:15:55.486048 http.c:848              <= Recv header: content-security-policy: default-src 'none'; sandbox
+04:15:55.486054 http.c:836              <= Recv header, 0000000041 bytes (0x00000029)
+04:15:55.486056 http.c:848              <= Recv header: content-type: text/plain; charset=UTF-8
+04:15:55.486061 http.c:836              <= Recv header, 0000000040 bytes (0x00000028)
+04:15:55.486063 http.c:848              <= Recv header: www-authenticate: Basic realm="GitHub"
+04:15:55.486067 http.c:836              <= Recv header, 0000000020 bytes (0x00000014)
+04:15:55.486070 http.c:848              <= Recv header: content-length: 26
+04:15:55.486073 http.c:836              <= Recv header, 0000000037 bytes (0x00000025)
+04:15:55.486076 http.c:848              <= Recv header: date: Thu, 27 Nov 2025 04:15:55 GMT
+04:15:55.486079 http.c:836              <= Recv header, 0000000023 bytes (0x00000017)
+04:15:55.486082 http.c:848              <= Recv header: x-frame-options: DENY
+04:15:55.486086 http.c:836              <= Recv header, 0000000073 bytes (0x00000049)
+04:15:55.486088 http.c:848              <= Recv header: strict-transport-security: max-age=31536000; includeSubDomains; preload
+04:15:55.486092 http.c:836              <= Recv header, 0000000057 bytes (0x00000039)
+04:15:55.486094 http.c:848              <= Recv header: x-github-request-id: D152:31F7AA:6D3EA6:89F7F4:6927D07B
+04:15:55.486099 http.c:836              <= Recv header, 0000000002 bytes (0x00000002)
+04:15:55.486102 http.c:848              <= Recv header:
+04:15:55.486137 http.c:889              == Info: Connection #0 to host github.com left intact
+04:15:55.486193 run-command.c:673       trace: run_command: replit-git-askpass 'Username for '\''https://github.com'\'': '
+04:15:55.486284 run-command.c:765       trace: start_command: /nix/store/d6mad4dkf6akii90k26dinhrg8a3xia8-replit-runtime-path/bin/replit-git-askpass 'Username for '\''https://github.com'\'': '
+04:15:55.504770 run-command.c:673       trace: run_command: replit-git-askpass 'Password for '\''https://token@github.com'\'': '
+04:15:55.504849 run-command.c:765       trace: start_command: /nix/store/d6mad4dkf6akii90k26dinhrg8a3xia8-replit-runtime-path/bin/replit-git-askpass 'Password for '\''https://token@github.com'\'': '
+04:15:56.275608 http.c:889              == Info: Re-using existing https: connection with host github.com
+04:15:56.275642 http.c:889              == Info: Server auth using Basic with user 'token'
+04:15:56.275674 http.c:889              == Info: [HTTP/2] [3] OPENED stream for https://github.com/shaman-mx/Texascowboy.git/info/refs?service=git-receive-pack
+04:15:56.275678 http.c:889              == Info: [HTTP/2] [3] [:method: GET]
+04:15:56.275680 http.c:889              == Info: [HTTP/2] [3] [:scheme: https]
+04:15:56.275683 http.c:889              == Info: [HTTP/2] [3] [:authority: github.com]
+04:15:56.275686 http.c:889              == Info: [HTTP/2] [3] [:path: /shaman-mx/Texascowboy.git/info/refs?service=git-receive-pack]
+04:15:56.275689 http.c:889              == Info: [HTTP/2] [3] [authorization: Basic <redacted>]
+04:15:56.275691 http.c:889              == Info: [HTTP/2] [3] [user-agent: git/2.50.1]
+04:15:56.275694 http.c:889              == Info: [HTTP/2] [3] [accept: */*]
+04:15:56.275696 http.c:889              == Info: [HTTP/2] [3] [accept-encoding: deflate, gzip, br, zstd]
+04:15:56.275699 http.c:889              == Info: [HTTP/2] [3] [accept-language: en-US, *;q=0.9]
+04:15:56.275701 http.c:889              == Info: [HTTP/2] [3] [pragma: no-cache]
+04:15:56.275838 http.c:836              => Send header, 0000000291 bytes (0x00000123)
+04:15:56.275844 http.c:848              => Send header: GET /shaman-mx/Texascowboy.git/info/refs?service=git-receive-pack HTTP/2
+04:15:56.275846 http.c:848              => Send header: Host: github.com
+04:15:56.275848 http.c:848              => Send header: Authorization: Basic <redacted>
+04:15:56.275850 http.c:848              => Send header: User-Agent: git/2.50.1
+04:15:56.275852 http.c:848              => Send header: Accept: */*
+04:15:56.275854 http.c:848              => Send header: Accept-Encoding: deflate, gzip, br, zstd
+04:15:56.275857 http.c:848              => Send header: Accept-Language: en-US, *;q=0.9
+04:15:56.275859 http.c:848              => Send header: Pragma: no-cache
+04:15:56.275861 http.c:848              => Send header:
+04:15:56.275901 http.c:889              == Info: Request completely sent off
+04:15:56.478096 http.c:836              <= Recv header, 0000000013 bytes (0x0000000d)
+04:15:56.478119 http.c:848              <= Recv header: HTTP/2 401
+04:15:56.478132 http.c:836              <= Recv header, 0000000026 bytes (0x0000001a)
+04:15:56.478136 http.c:848              <= Recv header: server: GitHub-Babel/3.0
+04:15:56.478142 http.c:836              <= Recv header, 0000000054 bytes (0x00000036)
+04:15:56.478145 http.c:848              <= Recv header: content-security-policy: default-src 'none'; sandbox
+04:15:56.478151 http.c:836              <= Recv header, 0000000041 bytes (0x00000029)
+04:15:56.478153 http.c:848              <= Recv header: content-type: text/plain; charset=UTF-8
+04:15:56.478159 http.c:889              == Info: Basic authentication problem, ignoring.
+04:15:56.478163 http.c:836              <= Recv header, 0000000040 bytes (0x00000028)
+04:15:56.478216 http.c:848              <= Recv header: www-authenticate: Basic realm="GitHub"
+04:15:56.478221 http.c:836              <= Recv header, 0000000020 bytes (0x00000014)
+04:15:56.478224 http.c:848              <= Recv header: content-length: 87
+04:15:56.478228 http.c:836              <= Recv header, 0000000037 bytes (0x00000025)
+04:15:56.478231 http.c:848              <= Recv header: date: Thu, 27 Nov 2025 04:15:56 GMT
+04:15:56.478237 http.c:836              <= Recv header, 0000000023 bytes (0x00000017)
+04:15:56.478239 http.c:848              <= Recv header: x-frame-options: DENY
+04:15:56.478243 http.c:836              <= Recv header, 0000000073 bytes (0x00000049)
+04:15:56.478246 http.c:848              <= Recv header: strict-transport-security: max-age=31536000; includeSubDomains; preload
+04:15:56.478250 http.c:836              <= Recv header, 0000000057 bytes (0x00000039)
+04:15:56.478253 http.c:848              <= Recv header: x-github-request-id: D152:31F7AA:6D3F2D:89F8A8:6927D07B
+04:15:56.478257 http.c:836              <= Recv header, 0000000002 bytes (0x00000002)
+04:15:56.478260 http.c:848              <= Recv header:
+04:15:56.478296 http.c:889              == Info: Connection #0 to host github.com left intact
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+fatal: Authentication failed for 'https://github.com/shaman-mx/Texascowboy.git/'
