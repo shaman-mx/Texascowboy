@@ -10112,5 +10112,39 @@
       "suited_combo",
       "high_onepair"
     ]
+  },
+  {
+    "round_id": "62682417-423e-4fae-8903-5531cc1f3b00",
+    "first_card": "Td",
+    "selected_boxes": [
+      "cowboy_win",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "f460b048-5637-4346-9c18-95dfb722e64d",
+    "first_card": "Kd",
+    "selected_boxes": [
+      "draw",
+      "suited_combo",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "effd8367-0d51-444e-823d-1a7078dd2dac",
+    "first_card": "6c",
+    "selected_boxes": [
+      "cowboy_win",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "10c5637a-c432-49b2-bbd3-f30124d61aa8",
+    "first_card": "3c",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "high_onepair"
+    ]
   }
 ]
