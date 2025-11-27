@@ -1,0 +1,4 @@
+gunicorn
+Flask>=2.0
+markupsafe
+requests
