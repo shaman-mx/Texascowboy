@@ -10146,5 +10146,162 @@
       "suited_combo",
       "high_onepair"
     ]
+  },
+  {
+    "round_id": "d6c613b0-8324-4553-b391-a930505efae8",
+    "first_card": "Kc",
+    "selected_boxes": [
+      "cowboy_win",
+      "pair_any",
+      "full_house"
+    ]
+  },
+  {
+    "round_id": "19eb2e9f-7b22-44a0-a7b0-af6445e834e5",
+    "first_card": "3h",
+    "selected_boxes": [
+      "cowboy_win",
+      "suited_combo",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "c815f9e0-5c71-435c-afde-ba596ec15da2",
+    "first_card": "3d",
+    "selected_boxes": [
+      "bull_win",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "ac091d3e-d6b7-416b-90e8-9d361439eeaf",
+    "first_card": "2d",
+    "selected_boxes": [
+      "draw",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "6877d53d-9a54-42dc-840a-a2ddf6c62919",
+    "first_card": "7d",
+    "selected_boxes": [
+      "cowboy_win",
+      "suited_combo",
+      "pair_any",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "54eb9e6c-59fc-469b-9940-95da87459b2b",
+    "first_card": "7c",
+    "selected_boxes": [
+      "cowboy_win",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "30032ced-33fd-4c55-aae8-86d9e680a7f5",
+    "first_card": "8h",
+    "selected_boxes": [
+      "bull_win",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "4b742897-3507-4522-bfb9-cea86c99bced",
+    "first_card": "Ah",
+    "selected_boxes": [
+      "draw",
+      "suited_combo",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "666b82ef-6d1e-486f-9828-1de1da310603",
+    "first_card": "As",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "a514448e-f315-4e6e-bde1-b6b86625be49",
+    "first_card": "8h",
+    "selected_boxes": [
+      "cowboy_win",
+      "suited_combo",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "fe0392b1-1085-4991-9de7-27e26b359682",
+    "first_card": "Tc",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "9ed9c7b1-48f4-4dda-a84a-3cd1df48d818",
+    "first_card": "Js",
+    "selected_boxes": [
+      "cowboy_win",
+      "suited_combo",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "60b67c17-aed8-40e3-95c9-5481a46274e2",
+    "first_card": "8h",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "trips"
+    ]
+  },
+  {
+    "round_id": "578624d0-2ef4-4e33-a096-9fca298f0e2e",
+    "first_card": "6h",
+    "selected_boxes": [
+      "cowboy_win",
+      "suited_combo",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "82572e42-af2f-4c29-ae40-71298ce66ba2",
+    "first_card": "9s",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "high_onepair"
+    ]
+  },
+  {
+    "round_id": "b7775f8b-00a1-42c9-95e5-e695406b2597",
+    "first_card": "Jd",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "full_house"
+    ]
+  },
+  {
+    "round_id": "43b7e746-75e6-41c8-8be8-c5663d7dd61a",
+    "first_card": "4s",
+    "selected_boxes": [
+      "cowboy_win",
+      "two_pair"
+    ]
+  },
+  {
+    "round_id": "b4aa6453-89a2-48fe-a362-7bbdd95a2196",
+    "first_card": "8c",
+    "selected_boxes": [
+      "draw",
+      "high_onepair"
+    ]
   }
 ]
