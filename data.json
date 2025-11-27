@@ -10303,5 +10303,22 @@
       "draw",
       "high_onepair"
     ]
+  },
+  {
+    "round_id": "84942160-eb3f-4920-a33e-acbd56e7b7ea",
+    "first_card": "Jd",
+    "selected_boxes": [
+      "cowboy_win",
+      "full_house"
+    ]
+  },
+  {
+    "round_id": "93ab5456-c7c7-4376-886e-615876f7746c",
+    "first_card": "Th",
+    "selected_boxes": [
+      "bull_win",
+      "suited_combo",
+      "trips"
+    ]
   }
 ]
