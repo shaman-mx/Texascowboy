@@ -1,0 +1,1307 @@
+=========================
+# FILE: main.py
+=========================
+from flask import Flask, render_template, request, redirect, url_for, jsonify
+import os
+import json
+import datetime
+import uuid
+from collections import Counter
+from typing import Optional, Iterable, List, Tuple
+from typing import Optional
+from markupsafe import Markup, escape
+from admin import admin_bp
+
+app = Flask(__name__, 
+template_folder="templates", 
+static_folder="static")
+app.register_blueprint(admin_bp, url_prefix="/admin")
+DATA_FILE = "data.json"
+HOUR_FILE = "hour.json"
+
+
+BOXES = {
+    "cowboy_win": ("🤠 Cowboy", "x2", "default"),
+    "draw": ("Hòa", "x20", "orange"),
+    "bull_win": ("🐮 Bull", "x2", "default"),
+
+    "suited_combo": ("Dây / Đồng chất / Dây đồng chất", "x1.66", "default"),
+    "pair_any": ("Đôi", "x8.5", "default"),
+    "aa": ("AA", "x100", "default"),
+
+    "high_onepair": ("Bài cao / Một đôi", "x2.2", "default"),
+    "two_pair": ("Hai đôi", "x3.1", "default"),
+    "trips": ("Bộ ba", "x4.7", "default"),
+    "full_house": ("Cù lũ", "x20", "orange"),
+    "four_kind": ("Tứ quý", "x248", "red"),
+}
+
+RANKS = "23456789TJQKA"
+SUITS = ['h', 'd', 'c', 's']
+
+# -----------------------
+# Data helpers
+# -----------------------
+def all_cards() -> List[str]:
+    return [r + s for r in RANKS for s in SUITS]
+
+def card_label(c: Optional[str]) -> Optional[str]:
+    if not c or len(c) < 2:
+        return c
+    rank = c[0].upper()
+    suit = c[1].lower()
+    if rank == "T":
+        rank = "10"
+    map_s = {'s': '♠', 'h': '♥', 'd': '♦', 'c': '♣'}
+    symbol = map_s.get(suit, suit)
+
+    # Màu cố định
+    red = '#c92a2a'        # hearts & diamonds
+    dark = '#222222'       # spades & clubs
+
+    if suit in ('h', 'd'):
+        # trả về HTML với style inline màu đỏ
+        return Markup(f'{escape(rank)}<span style="color:{red};font-weight:600;margin-left:4px">{escape(symbol)}</span>')
+    else:
+        return Markup(f'{escape(rank)}<span style="color:{dark};font-weight:600;margin-left:4px">{escape(symbol)}</span>')
+
+def ensure_data_file() -> None:
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f)
+
+def load_data() -> List[dict]:
+    ensure_data_file()
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+def save_data(arr: List[dict]) -> None:
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(arr, f, ensure_ascii=False, indent=2)
+
+# -----------------------
+# Hour file helpers (slot -> list of cards)
+# -----------------------
+def ensure_hour_file() -> None:
+    if not os.path.exists(HOUR_FILE):
+        with open(HOUR_FILE, "w", encoding="utf-8") as f:
+            json.dump({"aa": {}, "four_kind": {}}, f)
+
+def load_hour_data() -> dict:
+    ensure_hour_file()
+    try:
+        with open(HOUR_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        data = {"aa": {}, "four_kind": {}}
+
+    # migrate nhẹ nếu dữ liệu cũ là list các HH:MM strings
+    for key in ("aa", "four_kind"):
+        if key in data and isinstance(data[key], list):
+            new = {}
+            for t in data[key]:
+                if isinstance(t, str):
+                    new.setdefault(t, [])
+            data[key] = new
+        elif key not in data:
+            data[key] = {}
+
+    return data
+
+def save_hour_data(data: dict) -> None:
+    with open(HOUR_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+# -----------------------
+# Time helpers (VN)
+# -----------------------
+VN_TZ = datetime.timezone(datetime.timedelta(hours=7))
+
+def now_vn() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc).astimezone(VN_TZ)
+
+def format_hhmm(dt: datetime.datetime) -> str:
+    return dt.strftime("%H:%M")
+
+def parse_hhmm(s: str) -> Optional[Tuple[int, int]]:
+    """
+    Chuyển 'HH:MM' -> (h, m). Trả None nếu không phải chuỗi hợp lệ hoặc ngoài phạm vi.
+    """
+    if not isinstance(s, str):
+        return None
+    parts = s.split(":")
+    if len(parts) != 2:
+        return None
+    try:
+        h = int(parts[0])
+        m = int(parts[1])
+    except ValueError:
+        return None
+    if 0 <= h < 24 and 0 <= m < 60:
+        return h, m
+    return None
+
+def hhmm_to_minutes(hhmm: str) -> Optional[int]:
+    """
+    Chuyển 'HH:MM' -> số phút từ 00:00, hoặc None nếu input không hợp lệ.
+    """
+    parsed = parse_hhmm(hhmm)
+    if parsed is None:
+        return None
+    h, m = parsed
+    return h * 60 + m
+
+def minutes_to_hhmm(minutes: int) -> str:
+    minutes = minutes % (24 * 60)
+    h = minutes // 60
+    m = minutes % 60
+    return f"{h:02d}:{m:02d}"
+
+def next_cycle_slots(history_list: Optional[Iterable[str]], n: int = 3) -> Optional[List[str]]:
+    """
+    Trả về danh sách n slot 'HH:MM' tiếp theo theo vòng trong ngày dựa trên history_list.
+    - history_list có thể là None, list các chuỗi, hoặc dict.keys() (iterable).
+    - Nếu không có slot hợp lệ trả về None.
+    - Sắp xếp theo phút trong ngày, chọn slot đầu tiên lớn hơn thời điểm hiện tại,
+      nếu không có thì quay vòng từ đầu.
+    """
+    if not history_list:
+        return None
+
+    # Chuẩn hoá: lấy các chuỗi hợp lệ 'HH:MM' duy nhất theo thứ tự xuất hiện
+    seen = set()
+    clean: List[str] = []
+    for item in history_list:
+        if not isinstance(item, str):
+            continue
+        if item in seen:
+            continue
+        if parse_hhmm(item) is None:
+            continue
+        seen.add(item)
+        clean.append(item)
+
+    if not clean:
+        return None
+
+    # helper chuyển 'HH:MM' -> phút (đảm bảo int)
+    def to_minutes(s: str) -> int:
+        val = hhmm_to_minutes(s)
+        return int(val) if val is not None else 0
+
+    sorted_day = sorted(clean, key=to_minutes)
+
+    now_minutes = now_vn().hour * 60 + now_vn().minute
+
+    # tìm index bắt đầu: slot đầu tiên có phút > now_minutes
+    idx_start = 0
+    for i, s in enumerate(sorted_day):
+        if to_minutes(s) > now_minutes:
+            idx_start = i
+            break
+    else:
+        idx_start = 0
+
+    length = len(sorted_day)
+    res = [sorted_day[(idx_start + k) % length] for k in range(n)]
+    return res
+
+# -----------------------
+# Statistics
+# -----------------------
+def compute_stats_for_card(card: str) -> dict:
+    data = load_data()  # list round objects (schema mới)
+    # lọc rounds cho lá được chọn
+    rounds = [r for r in data if r.get("first_card") == card]
+    total = len(rounds)
+
+    # counts: số rounds chứa mỗi box (inclusive)
+    counts = Counter()
+    for r in rounds:
+        sbs = r.get("selected_boxes") or []
+        for sb in sbs:
+            counts[sb] += 1
+
+    # percent: tỉ lệ mỗi ô trên tổng rounds (inclusive)
+    percent = {k: round((counts.get(k, 0) / total * 100), 2) if total > 0 else 0.0 for k in BOXES.keys()}
+
+    SECTIONS = {
+        "top": ["cowboy_win", "draw", "bull_win"],
+        "left_group": ["pair_any", "aa"],
+        "right": ["high_onepair", "two_pair", "trips", "full_house", "four_kind"]
+    }
+
+    percent_by_section = {}
+
+    # top: nội bộ trong section (giữ như trước)
+    top_keys = SECTIONS["top"]
+    top_total = sum(counts.get(k, 0) for k in top_keys)
+    for k in top_keys:
+        percent_by_section[k] = round((counts.get(k, 0) / top_total * 100), 2) if top_total > 0 else 0.0
+
+    # left_group và suited_combo: tính theo tổng rounds (inclusive)
+    for k in SECTIONS["left_group"]:
+        percent_by_section[k] = percent.get(k, 0.0)
+    percent_by_section["suited_combo"] = percent.get("suited_combo", 0.0)
+
+    # right: non-four normalized nội bộ; four_kind độc lập theo tổng rounds
+    right_non_four = ["high_onepair", "two_pair", "trips", "full_house"]
+    non_four_total = sum(counts.get(k, 0) for k in right_non_four)
+    for k in right_non_four:
+        percent_by_section[k] = round((counts.get(k, 0) / non_four_total * 100), 2) if non_four_total > 0 else 0.0
+    percent_by_section["four_kind"] = round((counts.get("four_kind", 0) / total * 100), 2) if total > 0 else 0.0
+
+    return {
+        "total": total,
+        "counts": dict(counts),
+        "percent": percent,
+        "percent_by_section": percent_by_section
+    }
+    
+def compute_global_top_cards(limit: int = 12) -> List[tuple]:
+    data = load_data()  # mỗi phần tử là 1 round
+    c = Counter()
+    for r in data:
+        card = r.get("first_card")
+        if card:
+            c[card] += 1
+    return c.most_common(limit)
+    
+# -----------------------
+# Helpers for hour.json analysis
+# -----------------------
+def best_card_for_slot_from_hour(hour_box: dict, slot: str, min_samples: int = 1) -> Optional[dict]:
+    if not isinstance(hour_box, dict):
+        return None
+    cards = hour_box.get(slot, [])
+    if not cards:
+        return None
+    counts = Counter(cards)
+    total = len(cards)
+    best_card, best_count = counts.most_common(1)[0]
+    if best_count < min_samples:
+        return None
+    return {
+        "card": best_card,
+        "count": best_count,
+        "total": total,
+        "rate": round(best_count / total * 100, 2)
+    }
+
+def compute_topN_for_box(hour_data: dict, box_key: str, limit: int = 5) -> List[dict]:
+    """
+    Tính top N lá bài cho một box (ví dụ 'aa' hoặc 'four_kind').
+    Trả về list các dict: {card, count, total, rate}
+    """
+    counts = Counter()
+    total = 0
+    box_dict = hour_data.get(box_key, {})
+    if not isinstance(box_dict, dict):
+        return []
+    for slot, cards in box_dict.items():
+        if isinstance(cards, list):
+            for c in cards:
+                counts[c] += 1
+                total += 1
+    top = counts.most_common(limit)
+    result = []
+    for card, cnt in top:
+        result.append({
+            "card": card,
+            "count": cnt,
+            "total": total,
+            "rate": round((cnt / total * 100) if total > 0 else 0.0, 2)
+        })
+    return result
+
+# -----------------------
+# Minute stats helper + API
+# -----------------------
+from flask import request  # nếu chưa import ở đầu file
+
+def minute_counts_for_box(hour_data: dict, box_key: str) -> list:
+    """
+    Trả về list 1440 số nguyên: counts[0] = số lần nổ phút 00:00,
+    counts[1] = phút 00:01, ..., counts[1439] = phút 23:59.
+    """
+    counts = [0] * (24 * 60)
+    box = hour_data.get(box_key, {}) if isinstance(hour_data, dict) else {}
+    for slot, cards in box.items():
+        parsed = parse_hhmm(slot)
+        if parsed is None:
+            continue
+        h, m = parsed
+        idx = h * 60 + m
+        if isinstance(cards, list):
+            counts[idx] += len(cards)
+        elif isinstance(cards, int):
+            counts[idx] += cards
+    return counts
+
+# -----------------------
+# Routes
+# -----------------------
+@app.route("/api/four_kind_minutes")
+def api_four_kind_minutes():
+    """
+    Trả về dữ liệu theo phút. Hỗ trợ query param ?agg=N để gom N phút.
+    Nếu agg=1 trả 1440 điểm; nếu agg>1 trả buckets (labels là start time của bucket).
+    """
+    try:
+        agg = int(request.args.get('agg', '1'))
+        if agg <= 0:
+            agg = 1
+    except Exception:
+        agg = 1
+
+    hour_data = load_hour_data()
+    counts = minute_counts_for_box(hour_data, "four_kind")
+
+    if agg == 1:
+        labels = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(60)]
+        return jsonify({"labels": labels, "counts": counts})
+    else:
+        buckets = []
+        labels = []
+        for start in range(0, 24*60, agg):
+            s = sum(counts[start:start+agg])
+            buckets.append(s)
+            h = start // 60
+            m = start % 60
+            labels.append(f"{h:02d}:{m:02d}")
+        return jsonify({"labels": labels, "counts": buckets, "agg": agg})
+
+@app.route("/", methods=["GET"])
+def index():
+    sel = request.args.get("card", "")
+    cards = all_cards()
+    top_cards = compute_global_top_cards()
+    details = compute_stats_for_card(sel) if sel else None
+
+    # aggregate across rounds (schema mới)
+    data = load_data()
+    agg_counts = Counter()
+    total_all = len(data)  # mỗi phần tử là 1 round
+    for r in data:
+        sbs = r.get("selected_boxes", []) or []
+        for sb in sbs:
+            agg_counts[sb] += 1
+    agg_percent = {k: round((agg_counts.get(k, 0) / total_all * 100) if total_all > 0 else 0.0, 2) for k in BOXES.keys()}
+
+    # load hour data early
+    hour_data = load_hour_data()
+
+    # Lấy danh sách slot từ hour_data (keys của dict)
+    aa_box = hour_data.get("aa", {})
+    fk_box = hour_data.get("four_kind", {})
+
+    aa_slots = list(aa_box.keys()) if isinstance(aa_box, dict) else []
+    fk_slots = list(fk_box.keys()) if isinstance(fk_box, dict) else []
+
+    aa_recent = aa_slots[-3:][::-1] if aa_slots else []
+    fk_recent = fk_slots[-3:][::-1] if fk_slots else []
+
+    # predictions (theo vòng lặp trong ngày) dựa trên slot list
+    aa_pred = next_cycle_slots(aa_slots, 3)
+    fk_pred = next_cycle_slots(fk_slots, 3)
+
+    # tổng số bản ghi trong data (dùng khi chưa chọn lá)
+    total_all = len(data)
+
+    # nếu có lá được chọn, details đã chứa "total"
+    if sel and details:
+        count_for_display = details.get("total", 0)
+    else:
+        count_for_display = total_all
+
+    # Tính lá tốt nhất cho mỗi slot (dựa trên hour.json)
+    aa_best: dict = {}
+    fk_best: dict = {}
+    for t in aa_recent:
+        aa_best[t] = best_card_for_slot_from_hour(hour_data.get("aa", {}), t)
+    for t in fk_recent:
+        fk_best[t] = best_card_for_slot_from_hour(hour_data.get("four_kind", {}), t)
+    if aa_pred:
+        for t in aa_pred:
+            aa_best.setdefault(t, best_card_for_slot_from_hour(hour_data.get("aa", {}), t))
+    if fk_pred:
+        for t in fk_pred:
+            fk_best.setdefault(t, best_card_for_slot_from_hour(hour_data.get("four_kind", {}), t))
+
+    # Tính Top 5 riêng cho AA và Tứ quý
+    top5_aa = compute_topN_for_box(hour_data, "aa", limit=5)
+    top5_fk = compute_topN_for_box(hour_data, "four_kind", limit=5)
+
+    return render_template("index.html",
+        cards=cards, RANKS=RANKS, SUITS=SUITS,
+        card_label=card_label, BOXES=BOXES,
+        selected_card=sel, details=details,
+        top_cards=top_cards, agg_percent=agg_percent,
+        aa_recent=aa_recent, fk_recent=fk_recent,
+        aa_pred=aa_pred, fk_pred=fk_pred,
+        aa_best=aa_best, fk_best=fk_best,
+        top5_aa=top5_aa, top5_fk=top5_fk,
+        count_for_display=count_for_display
+    )
+
+@app.route("/save", methods=["POST"])
+def save_round():
+    first_card = request.form.get("first_card", "").strip()
+    selected_boxes = request.form.getlist("selected_box")
+
+    if not first_card or not selected_boxes:
+        return redirect(url_for("index", card=first_card))
+
+    data = load_data()
+    hour_data = load_hour_data()
+    now_str = format_hhmm(now_vn())  # slot HH:MM lưu vào hour.json
+
+    # Tạo round object (KHÔNG chứa timestamp)
+    rec = {
+        "round_id": str(uuid.uuid4()),
+        "first_card": first_card,
+        "selected_boxes": selected_boxes
+    }
+    data.append(rec)
+
+    # Cập nhật hour.json: hour giữ vai trò thời gian/slot
+    slot = now_str
+    if "aa" in selected_boxes:
+        hour_data.setdefault("aa", {})
+        hour_data["aa"].setdefault(slot, [])
+        hour_data["aa"][slot].append(first_card)
+    if "four_kind" in selected_boxes:
+        hour_data.setdefault("four_kind", {})
+        hour_data["four_kind"].setdefault(slot, [])
+        hour_data["four_kind"][slot].append(first_card)
+
+    save_data(data)
+    save_hour_data(hour_data)
+    return redirect(url_for("index"))
+
+@app.route("/api/stats/<card>")
+def api_stats_card(card: str):
+    return jsonify(compute_stats_for_card(card))
+
+@app.route("/api/boxes")
+def api_boxes():
+    return jsonify([
+        {"key": k, "label": v[0], "payout": v[1], "color": v[2]}
+        for k, v in BOXES.items()
+    ])
+
+@app.route("/admin/clear", methods=["POST"])
+def admin_clear():
+    save_data([])
+    save_hour_data({"aa": {}, "four_kind": {}})
+    return redirect(url_for("index"))
+
+if __name__ == "__main__":
+    ensure_data_file()
+    ensure_hour_file()
+    app.run(host="0.0.0.0", port=8080, debug=True)
+=========================
+# FILE: static/style.css
+=========================
+:root{
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --border: #e3e6ea;
+  --muted: #6f7780;
+  --primary: #1a73e8;
+  --orange: #d97a18;
+  --red: #c92a2a;
+  --shadow: rgba(15,23,42,0.08);
+  --gap: 12px;
+  --min-col: 120px;
+}
+
+/* -------------------------
+   Reset / Base
+   ------------------------- */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body{
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: #111;
+  font-size: 14px;
+  line-height: 1.35;
+}
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* -------------------------
+   Utilities
+   ------------------------- */
+.hidden { display: none; }
+.center { display:flex; align-items:center; justify-content:center; }
+.muted { color: var(--muted); font-size:11px; }
+.slot-percent { font-size:11px; color:var(--muted); margin-left:6px; font-weight:600; }
+
+/* -------------------------
+   Controls / Buttons
+   ------------------------- */
+.btn {
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:#fff;
+  cursor:pointer;
+  font-weight:600;
+}
+.btn.primary { background:var(--primary); color:#fff; border-color:transparent; }
+
+/* -------------------------
+   Selector / Dropdown
+   ------------------------- */
+.grid-label { display:block; margin-bottom:6px; color:#333; font-weight:600; }
+.card-grid { margin-bottom:10px; }
+.card-row { display:grid; grid-template-columns: repeat(4, 1fr); gap:4px; margin-bottom:4px; }
+.card-btn{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:3px 10px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:#fafafa;
+  cursor:pointer;
+  white-space:nowrap;
+  text-align:center;
+  transition: background .12s ease, border-color .12s ease;
+  font-size:13px;
+}
+.card-btn:hover { background:#f0f8ff; }
+.card-btn.selected { background:#d0ebff; border-color:var(--primary); color:var(--primary); }
+
+.card-dropdown { position:relative; display:inline-block; margin-bottom:10px; }
+.dropdown-toggle{
+  padding:8px 10px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:#fff;
+  cursor:pointer;
+  min-width:160px;
+  text-align:center;
+  font-size:12px;
+}
+.dropdown-grid{
+  display:none;
+  position:absolute;
+  top:100%;
+  left:0;
+  z-index:9999;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:8px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.1);
+  min-width:320px;
+  max-height:60vh;
+  overflow:auto;
+}
+
+/* -------------------------
+   Layout: Top / Bottom
+   ------------------------- */
+/* Top block: three equal columns (uses fr to avoid percent+gap overflow) */
+.top-block {
+  display: grid;
+  grid-template-columns: 33.3fr 33.3fr 33.3fr;
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+  align-items: stretch;
+}
+.top-block > * { min-width: 0; box-sizing: border-box; }
+
+/* Bottom section: align widths with top (40/60 split) */
+.bottom-section {
+  display: grid;
+  grid-template-columns: 40fr 60fr;
+  gap: var(--gap);
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Left / Right columns */
+.left-block {
+  width: 100%;
+  min-width: 220px;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  box-sizing: border-box;
+}
+.right-block {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 5px;
+  align-items: start;
+  min-width: calc(var(--min-col) * 2 + 24px);
+}
+
+/* -------------------------
+   Box / Content
+   ------------------------- */
+/* Base box: fixed height, centered main content */
+.box {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: 120px;
+  min-height: 120px;
+  padding: 6px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* Main content area (centered) */
+.box .main {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* Bottom area: pushed to box bottom and stacked payout above percent */
+.box .bottom-area {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 6px 8px 8px;
+  box-sizing: border-box;
+  width: 100%;
+}
+/* --- Restore variant colors for draw (hòa), full_house (cù lũ) and four_kind (tứ quý) --- */
+
+/* Hòa / Cù lũ (cam) */
+.box.orange .label,
+.box.orange .payout,
+.box[data-val="draw"] .label,
+.box[data-val="draw"] .payout,
+.box[data-val="full_house"] .label,
+.box[data-val="full_house"] .payout {
+  color: var(--orange);
+}
+
+/* Tứ quý (đỏ) */
+.box.red .label,
+.box.red .payout,
+.box[data-val="four_kind"] .label,
+.box[data-val="four_kind"] .payout {
+  color: var(--red);
+}
+
+/* Bảo toàn màu của .percent (không để bị ghi đè) */
+.box.orange .percent,
+.box.red .percent,
+.box[data-val="draw"] .percent,
+.box[data-val="full_house"] .percent,
+.box[data-val="four_kind"] .percent {
+  color: #0a7d3a; /* giữ màu percent hiện tại */
+}
+
+/* Nhẹ nhàng nhấn viền cho nhận diện (tùy chọn, không bắt buộc) */
+.box.orange { border-color: rgba(217,122,24,0.2); }
+.box.red { border-color: rgba(201,42,42,0.2); }
+/* If payout/percent are direct children of .box, support stacking and bottom alignment */
+.box > .payout,
+.box > .percent {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin: 0;
+}
+
+/* -------------------------
+   Text / Inline elements
+   ------------------------- */
+.label { font-weight:600; font-size:11px; color:#3d3d3d; }
+.payout {
+  font-weight:500;
+  font-size:9px;
+  color:#555;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.percent {
+  font-weight:600;
+  font-size:9px;
+  background:#ebffed;
+  color:#0a7d3a;
+  padding:3px 10px;
+  border-radius:4px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:56px;
+  margin: -4px;
+}
+
+/* -------------------------
+   Right block rows / grids
+   ------------------------- */
+.rb-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(var(--min-col), 1fr));
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+.rb-row > * { min-width: 0; box-sizing: border-box; }
+.rb-row .box {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: center;
+}
+.rb-row .box.full-width { grid-column: 1 / -1; }
+
+/* AA & Four-kind grid */
+.section .aa-fk-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 0px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+
+/* Top5 grid */
+.section .top5-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+}
+.section .top5-column { padding: 6px; min-width: 0; box-sizing: border-box; }
+
+.top5-box {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  box-sizing: border-box;
+}
+.top5-title { font-weight:700; margin-bottom:6px; color:#111; }
+.top5-item {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:6px 8px;
+  border-bottom:1px dashed #eee;
+}
+.top5-item:last-child { border-bottom:0; }
+.top5-left { display:flex; gap:8px; align-items:center; }
+.top5-rank { font-weight:700; width:28px; color:#333; }
+.top5-card { font-weight:700; color:#111; }
+.top5-rate { color:var(--muted); font-weight:600; }
+
+/* -------------------------
+   Section / Misc
+   ------------------------- */
+.section{
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fafafa;
+  padding:12px;
+  margin-bottom:14px;
+}
+.section h3 { margin:0 0 8px; font-size:13px; font-weight:600; color:#333; text-align:center; }
+
+/* Hover / selected */
+.box:hover { background:#f7fbff; transform:translateY(-2px); transition: transform .12s ease, background .12s ease; }
+.box.selected { background:#e8f4ff; border-color:#cfeaff; box-shadow:0 6px 14px rgba(26,115,232,0.06); }
+
+/* Accessibility / focus */
+.card-btn:focus, .dropdown-toggle:focus, .btn:focus {
+  outline: 3px solid rgba(26,115,232,0.12);
+  outline-offset: 2px;
+}
+
+/* -------------------------
+   Responsive scaling (keep layout stable)
+   ------------------------- */
+@media (max-width: 1000px) {
+  :root { --min-col: 100px; }
+  body { font-size: 13px; }
+  .box { height: 120px; min-height: 120px; padding: 10px; }
+}
+@media (max-width: 760px) {
+  :root { --min-col: 88px; }
+  body { font-size: 12px; }
+  .box { height: 120px; min-height: 120px; padding: 8px; }
+  .left-block { min-width: 180px; }
+  .right-block { min-width: calc(var(--min-col) * 2 + 20px); }
+}
+@media (max-width: 520px) {
+  :root { --min-col: 72px; }
+  body { font-size: 11px; }
+  .box { height: 110px; min-height: 110px; padding: 6px; }
+  .left-block { min-width: 160px; }
+  .right-block { min-width: calc(var(--min-col) * 2 + 16px); }
+}
+
+/* -------------------------
+   Helpers
+   ------------------------- */
+.card-row { gap:8px; }
+.dropdown-grid { box-shadow: 0 8px 24px rgba(0,0,0,0.08); max-height:60vh; overflow:auto; }
+.label, .payout, .top5-card { word-break: break-word; overflow-wrap: anywhere; }
+=========================
+# FILE: templates/index.html
+=========================
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Phân tích xác suất</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+<body>
+<div class="container">
+
+  <!-- CARD SELECTOR DROPDOWN-GRID -->
+  <div class="card-dropdown">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="dropdown-toggle"
+           id="dropdown-toggle"
+           data-suit="{{ selected_card[1] if selected_card }}"
+           onclick="toggleGrid()">
+        {{ card_label(selected_card) if selected_card else "Chọn lá bài đầu tiên" }}
+      </div>
+
+      <!-- Bộ đếm kết quả -->
+      <div style="font-size:9px;color:var(--muted);">
+        Xác suất được tính trên dữ liệu <strong>{{ count_for_display }}</strong> trận
+      </div>
+    </div>
+
+    <!-- form GET để chọn lá (submit khi chọn trong grid) -->
+    <form id="card-select-form" method="GET" action="/" style="display:none;">
+      <input type="hidden" name="card" id="card-input" value="{{ selected_card }}">
+    </form>
+
+    <div class="dropdown-grid" id="card-grid" aria-hidden="true">
+      {% for r in RANKS %}
+        <div class="card-row">
+          {% for s in SUITS %}
+            {% set c = r ~ s %}
+            <div class="card-btn {% if selected_card == c %}selected{% endif %}"
+                 data-suit="{{ s }}"
+                 onclick="selectCard('{{ c }}')">
+              {{ card_label(c) }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- FORM LƯU -->
+  <form method="POST" action="/save" id="save-form">
+    <input type="hidden" name="first_card" id="save-first-card" value="{{ selected_card }}">
+    <div id="selected-container"></div>
+
+    <!-- TOP BLOCK -->
+    <div class="section">
+      <div class="top-block">
+        {% for key in ["cowboy_win","draw","bull_win"] %}
+        <div class="box top-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+          <div class="box-header">
+            <div class="label">{{ BOXES[key][0] }}</div>
+          </div>
+          <div class="bottom-area">
+            <div class="payout">{{ BOXES[key][1] }}</div>
+            <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- BOTTOM SECTION -->
+    <div class="bottom-section">
+
+      <!-- LEFT -->
+      <div class="section left-block">
+        <h3>Player bất kỳ</h3>
+        {% for key in ["suited_combo","pair_any","aa"] %}
+        <div class="box left-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+          <div class="box-header">
+            <div class="label">{{ BOXES[key][0] }}</div>
+          </div>
+          <div class="bottom-area">
+            <div class="payout">{{ BOXES[key][1] }}</div>
+            <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- RIGHT -->
+      <div class="section right-block">
+        <h3>Bài của người thắng</h3>
+        <div class="rb-row">
+          {% for key in ["high_onepair","two_pair"] %}
+          <div class="box rb-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+            <div class="box-header">
+              <div class="label">{{ BOXES[key][0] }}</div>
+            </div>
+            <div class="bottom-area">
+              <div class="payout">{{ BOXES[key][1] }}</div>
+              <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="rb-row">
+          {% for key in ["trips","full_house"] %}
+          <div class="box rb-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+            <div class="box-header">
+              <div class="label">{{ BOXES[key][0] }}</div>
+            </div>
+            <div class="bottom-area">
+              <div class="payout">{{ BOXES[key][1] }}</div>
+              <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="rb-row">
+          <div class="box rb-box full-width {{ BOXES['four_kind'][2] }}" data-val="four_kind" onclick="toggleSelect(this)">
+            <div class="box-header">
+              <div class="label">{{ BOXES['four_kind'][0] }}</div>
+            </div>
+            <div class="bottom-area">
+              <div class="payout">{{ BOXES['four_kind'][1] }}</div>
+              <div class="percent">
+  {% set pct = (details.percent_by_section['four_kind'] if details and 'four_kind' in details.percent_by_section else agg_percent.get('four_kind', 0)) %}
+  {{ pct|round(2) }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+</div>
+    <!-- Nút Lưu -->
+    {% if selected_card %}
+    <div class="save-form" style="margin-left:10px">
+      <button type="submit" class="btn primary" onclick="syncSaveFirstCard()">Lưu</button>
+      <button type="button" class="btn" onclick="clearSelection()">Bỏ chọn</button>
+    </div>
+    {% else %}
+    <div class="muted" style="margin-left:10px;font-size:9px">Chọn lá bài đầu tiên và các ô cược tương ứng để ghi dữ liệu.</div>
+    {% endif %}
+  </form>
+</div>
+
+<!-- LỊCH SỬ 3 MỐC GẦN NHẤT VÀ DỰ ĐOÁN 3 KHUNG GIỜ KẾ TIẾP -->
+<div class="section" style="margin-top:20px;">
+  <h3 style="margin-bottom:12px;">⏰ Khung giờ AA & Tứ quý</h3>
+
+  <div class="aa-fk-grid">
+    <!-- AA column -->
+    <div class="aa-column">
+      <h4>🔹AA - 3 mốc gần nhất</h4>
+      <ul>
+        {% if aa_recent %}
+          {% for t in aa_recent %}
+            <li>
+              {{ t }}
+              {% set best = aa_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+
+      <h4 style="margin-top:12px;">🔹AA - 3 mốc sắp tới (dự đoán)</h4>
+      <ul>
+        {% if aa_pred %}
+          {% for t in aa_pred %}
+            <li>
+              {{ t }}
+              {% set best = aa_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+    </div>
+
+    <!-- Four-kind column -->
+    <div class="fk-column">
+      <h4>🔸Tứ - 3 mốc gần nhất</h4>
+      <ul>
+        {% if fk_recent %}
+          {% for t in fk_recent %}
+            <li>
+              {{ t }}
+              {% set best = fk_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+
+      <h4 style="margin-top:12px;">🔸Tứ - 3 mốc sắp tới (dự đoán)</h4>
+      <ul>
+        {% if fk_pred %}
+          {% for t in fk_pred %}
+            <li>
+              {{ t }}
+              {% set best = fk_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Top 5 riêng AA & Tứ (2 cột) -->
+<div class="section" style="margin-top:12px;">
+  <h3 style="margin-bottom:12px;">🏆 Top 5 lá bài có tỉ lệ nổ AA & Tứ cao nhất</h3>
+
+  <div class="top5-grid">
+    <!-- AA Top5 -->
+    <div class="top5-column">
+      <div class="top5-box">
+        <div class="top5-title">AA</div>
+        {% if top5_aa %}
+          {% for it in top5_aa %}
+            <div class="top5-item">
+              <div class="top5-left">
+                <div class="top5-rank">{{ loop.index }}</div>
+                <div class="top5-card">{{ card_label(it.card) }}</div>
+              </div>
+              <div class="top5-rate">{{ it.rate }}%</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted" style="padding:8px;">Chưa có dữ liệu</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Four-kind Top5 -->
+    <div class="top5-column">
+      <div class="top5-box">
+        <div class="top5-title">Tứ quý</div>
+        {% if top5_fk %}
+          {% for it in top5_fk %}
+            <div class="top5-item">
+              <div class="top5-left">
+                <div class="top5-rank">{{ loop.index }}</div>
+                <div class="top5-card">{{ card_label(it.card) }}</div>
+              </div>
+              <div class="top5-rate">{{ it.rate }}%</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted" style="padding:8px;">Chưa có dữ liệu</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Four-kind minute chart -->
+<div class="section" style="margin-top:20px;">
+  <h3 style="margin-bottom:10px;">📊 Thống kê Tứ quý theo khung giờ (00:00 - 23:59)</h3>
+
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+    <label style="font-size:13px;color:#333">Gộp mỗi</label>
+    <select id="fk-agg-select" style="padding:6px;border:1px solid #e3e6ea;border-radius:6px;">
+      <option value="1">1 phút</option>
+      <option value="5">5 phút</option>
+      <option value="15">15 phút</option>
+      <option value="60">60 phút</option>
+    </select>
+    <button id="fk-refresh-btn" class="btn" style="padding:6px 10px;margin-left:8px">Cập nhật</button>
+  </div>
+
+  <div style="position:relative; width:100%; height:320px;">
+    <canvas id="fourKindChart" aria-label="Biểu đồ phút nổ tứ quý"></canvas>
+  </div>
+</div>
+
+<!-- include Chart.js and the new chart script (đặt trước </body>) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='four_kind_chart.js') }}"></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const sel = document.getElementById('fk-agg-select');
+    const btn = document.getElementById('fk-refresh-btn');
+    if (!sel || !btn) return;
+    btn.addEventListener('click', function () {
+      const agg = parseInt(sel.value, 10) || 1;
+      if (window.refreshFourKindChart) window.refreshFourKindChart(agg);
+    });
+  });
+      </script>
+    
+<script>
+function toggleGrid(){
+  var grid = document.getElementById('card-grid');
+  var toggle = document.getElementById('dropdown-toggle');
+  if(!grid) return;
+  var open = grid.style.display === 'block';
+  grid.style.display = open ? 'none' : 'block';
+  grid.setAttribute('aria-hidden', open ? 'true':'false');
+  if(toggle){ toggle.classList.toggle('open', !open); }
+}
+
+function selectCard(val){
+  var input = document.getElementById('card-input');
+  if(input){ input.value = val; }
+  var grid = document.getElementById('card-grid');
+  if(grid){ grid.style.display = 'none'; grid.setAttribute('aria-hidden','true'); }
+  document.getElementById('card-select-form').submit();
+}
+
+function syncSaveFirstCard(){
+  var sel = document.getElementById('card-input') ? document.getElementById('card-input').value : '';
+  var saveInput = document.getElementById('save-first-card');
+  if(saveInput) saveInput.value = sel;
+}
+
+function encodeId(key){ return 'sel-' + key.replace(/[^a-z0-9_\-]/gi, '_'); }
+
+function toggleSelect(el){
+  var val = el.getAttribute('data-val'); if(!val) return;
+  var id = encodeId(val);
+  var container = document.getElementById('selected-container');
+  var existing = document.getElementById(id);
+
+  var topKeys = ["cowboy_win","draw","bull_win"];
+  if(topKeys.includes(val)){
+    topKeys.forEach(function(k){
+      if(k !== val){
+        var otherId = encodeId(k);
+        var otherEl = document.querySelector('.box[data-val="'+k+'"]');
+        var otherInp = document.getElementById(otherId);
+        if(otherInp){ otherInp.remove(); }
+        if(otherEl){ otherEl.classList.remove('selected'); }
+      }
+    });
+    if(existing){
+      el.classList.remove('selected');
+      existing.remove();
+    } else {
+      el.classList.add('selected');
+      var inp=document.createElement('input');
+      inp.type='hidden'; inp.name='selected_box'; inp.value=val; inp.id=id;
+      container.appendChild(inp);
+    }
+    return;
+  }
+
+  if(existing){
+    el.classList.remove('selected');
+    existing.remove();
+  } else {
+    el.classList.add('selected');
+    var inp=document.createElement('input');
+    inp.type='hidden'; inp.name='selected_box'; inp.value=val; inp.id=id;
+    container.appendChild(inp);
+  }
+}
+
+function clearSelection(){
+  document.querySelectorAll('.box.selected').forEach(function(b){ b.classList.remove('selected'); });
+  var container = document.getElementById('selected-container');
+  if(container){ container.innerHTML=''; }
+}
+</script>
+  </body>
+</html>

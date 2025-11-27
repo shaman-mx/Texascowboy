@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Phân tích xác suất</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+<body>
+<div class="container">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-messages">
+      {% for category, msg in messages %}
+        <div class="flash {{ category }}">{{ msg }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+  <!-- CARD SELECTOR DROPDOWN-GRID -->
+  <div class="card-dropdown">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="dropdown-toggle"
+           id="dropdown-toggle"
+           data-suit="{{ selected_card[1] if selected_card }}"
+           onclick="toggleGrid()">
+        {{ card_label(selected_card) if selected_card else "Chọn lá bài đầu tiên" }}
+      </div>
+
+      <!-- Bộ đếm kết quả -->
+      <div style="font-size:9px;color:var(--muted);">
+        Xác suất được tính trên dữ liệu <strong>{{ count_for_display }}</strong> trận
+      </div>
+    </div>
+
+    <!-- form GET để chọn lá (submit khi chọn trong grid) -->
+    <form id="card-select-form" method="GET" action="/" style="display:none;">
+      <input type="hidden" name="card" id="card-input" value="{{ selected_card }}">
+    </form>
+
+    <div class="dropdown-grid" id="card-grid" aria-hidden="true">
+      {% for r in RANKS %}
+        <div class="card-row">
+          {% for s in SUITS %}
+            {% set c = r ~ s %}
+            <div class="card-btn {% if selected_card == c %}selected{% endif %}"
+                 data-suit="{{ s }}"
+                 onclick="selectCard('{{ c }}')">
+              {{ card_label(c) }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- FORM LƯU -->
+  <form method="POST" action="/save" id="save-form">
+    <input type="hidden" name="first_card" id="save-first-card" value="{{ selected_card }}">
+    <div id="selected-container"></div>
+
+    <!-- TOP BLOCK -->
+    <div class="section">
+      <div class="top-block">
+        {% for key in ["cowboy_win","draw","bull_win"] %}
+        <div class="box top-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+          <div class="box-header">
+            <div class="label">{{ BOXES[key][0] }}</div>
+          </div>
+          <div class="bottom-area">
+            <div class="payout">{{ BOXES[key][1] }}</div>
+            <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- BOTTOM SECTION -->
+    <div class="bottom-section">
+
+      <!-- LEFT -->
+      <div class="section left-block">
+        <h3>Player bất kỳ</h3>
+        {% for key in ["suited_combo","pair_any","aa"] %}
+        <div class="box left-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+          <div class="box-header">
+            <div class="label">{{ BOXES[key][0] }}</div>
+          </div>
+          <div class="bottom-area">
+            <div class="payout">{{ BOXES[key][1] }}</div>
+            <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- RIGHT -->
+      <div class="section right-block">
+        <h3>Bài của người thắng</h3>
+        <div class="rb-row">
+          {% for key in ["high_onepair","two_pair"] %}
+          <div class="box rb-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+            <div class="box-header">
+              <div class="label">{{ BOXES[key][0] }}</div>
+            </div>
+            <div class="bottom-area">
+              <div class="payout">{{ BOXES[key][1] }}</div>
+              <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="rb-row">
+          {% for key in ["trips","full_house"] %}
+          <div class="box rb-box {{ BOXES[key][2] }}" data-val="{{ key }}" onclick="toggleSelect(this)">
+            <div class="box-header">
+              <div class="label">{{ BOXES[key][0] }}</div>
+            </div>
+            <div class="bottom-area">
+              <div class="payout">{{ BOXES[key][1] }}</div>
+              <div class="percent">
+  {% set pct = (details.percent_by_section[key] if details else agg_percent[key]) %}
+  {{ pct|round(2) }}%
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="rb-row">
+          <div class="box rb-box full-width {{ BOXES['four_kind'][2] }}" data-val="four_kind" onclick="toggleSelect(this)">
+            <div class="box-header">
+              <div class="label">{{ BOXES['four_kind'][0] }}</div>
+            </div>
+            <div class="bottom-area">
+              <div class="payout">{{ BOXES['four_kind'][1] }}</div>
+              <div class="percent">
+  {% set pct = (details.percent_by_section['four_kind'] if details and 'four_kind' in details.percent_by_section else agg_percent.get('four_kind', 0)) %}
+  {{ pct|round(2) }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+    </div>
+</div>
+    <!-- Nút Lưu -->
+    {% if selected_card %}
+    <div class="save-form" style="margin-left:10px">
+      <button type="submit" class="btn primary" onclick="syncSaveFirstCard()">Lưu</button>
+      <button type="button" class="btn" onclick="clearSelection()">Bỏ chọn</button>
+    </div>
+    {% else %}
+    <div class="muted" style="margin-left:10px;font-size:9px">Chọn lá bài đầu tiên và các ô cược tương ứng để ghi dữ liệu.</div>
+    {% endif %}
+  </form>
+</div>
+
+<!-- LỊCH SỬ 3 MỐC GẦN NHẤT VÀ DỰ ĐOÁN 3 KHUNG GIỜ KẾ TIẾP -->
+<div class="section" style="margin-top:20px;">
+  <h3 style="margin-bottom:12px;">⏰ Khung giờ AA & Tứ quý</h3>
+
+  <div class="aa-fk-grid">
+    <!-- AA column -->
+    <div class="aa-column">
+      <h4>🔹AA - 3 mốc gần nhất</h4>
+      <ul>
+        {% if aa_recent %}
+          {% for t in aa_recent %}
+            <li>
+              {{ t }}
+              {% set best = aa_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+
+      <h4 style="margin-top:12px;">🔹AA - 3 mốc sắp tới (dự đoán)</h4>
+      <ul>
+        {% if aa_pred %}
+          {% for t in aa_pred %}
+            <li>
+              {{ t }}
+              {% set best = aa_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+    </div>
+
+    <!-- Four-kind column -->
+    <div class="fk-column">
+      <h4>🔸Tứ - 3 mốc gần nhất</h4>
+      <ul>
+        {% if fk_recent %}
+          {% for t in fk_recent %}
+            <li>
+              {{ t }}
+              {% set best = fk_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+
+      <h4 style="margin-top:12px;">🔸Tứ - 3 mốc sắp tới (dự đoán)</h4>
+      <ul>
+        {% if fk_pred %}
+          {% for t in fk_pred %}
+            <li>
+              {{ t }}
+              {% set best = fk_best.get(t) %}
+              {% if best %}
+                — <strong>{{ card_label(best.card) }}</strong>
+                <span class="slot-percent">{{ best.rate }}%</span>
+              {% else %}
+                — <span class="muted">Chưa có dữ liệu</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        {% else %}
+          <li class="muted">Chưa có dữ liệu</li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Top 5 riêng AA & Tứ (2 cột) -->
+<div class="section" style="margin-top:12px;">
+  <h3 style="margin-bottom:12px;">🏆 Top 5 lá bài có tỉ lệ nổ AA & Tứ cao nhất</h3>
+
+  <div class="top5-grid">
+    <!-- AA Top5 -->
+    <div class="top5-column">
+      <div class="top5-box">
+        <div class="top5-title">AA</div>
+        {% if top5_aa %}
+          {% for it in top5_aa %}
+            <div class="top5-item">
+              <div class="top5-left">
+                <div class="top5-rank">{{ loop.index }}</div>
+                <div class="top5-card">{{ card_label(it.card) }}</div>
+              </div>
+              <div class="top5-rate">{{ it.rate }}%</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted" style="padding:8px;">Chưa có dữ liệu</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Four-kind Top5 -->
+    <div class="top5-column">
+      <div class="top5-box">
+        <div class="top5-title">Tứ quý</div>
+        {% if top5_fk %}
+          {% for it in top5_fk %}
+            <div class="top5-item">
+              <div class="top5-left">
+                <div class="top5-rank">{{ loop.index }}</div>
+                <div class="top5-card">{{ card_label(it.card) }}</div>
+              </div>
+              <div class="top5-rate">{{ it.rate }}%</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="muted" style="padding:8px;">Chưa có dữ liệu</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <!-- Four-kind -->
+  <div class="chart-section">
+    <h3 style="margin-bottom:12px;">📊 Tứ quý theo khung giờ</h3>
+    <div class="controls" aria-label="Controls for four-kind chart">
+      <label for="fk-agg-select">Gộp mỗi</label>
+      <select id="fk-agg-select" aria-controls="fourKindChart">
+        <option value="1">1 phút</option>
+        <option value="5">5 phút</option>
+        <option value="15">15 phút</option>
+        <option value="60">60 phút</option>
+      </select>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="fourKindChart" aria-label="Biểu đồ phút nổ tứ quý"></canvas>
+    </div>
+  </div>
+
+  <!-- AA -->
+  <div class="chart-section">
+    <h3 style="margin-bottom:12px;">📊 AA theo khung giờ</h3>
+    <div class="controls" aria-label="Controls for AA chart">
+      <label for="aa-agg-select">Gộp mỗi</label>
+      <select id="aa-agg-select" aria-controls="aaChart">
+        <option value="1">1 phút</option>
+        <option value="5">5 phút</option>
+        <option value="15">15 phút</option>
+        <option value="60">60 phút</option>
+      </select>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="aaChart" aria-label="Biểu đồ phút nổ AA"></canvas>
+    </div>
+  </div>
+</div>
+  </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='four_kind_chart.js') }}"></script>
+<script src="{{ url_for('static', filename='aa_chart.js') }}"></script>
+<script src="{{ url_for('static', filename='updatechart.js') }}"></script>
+<script src="{{ url_for('static', filename='alert.js') }}"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='card.js') }}"></script>
+  </body>
+</html>

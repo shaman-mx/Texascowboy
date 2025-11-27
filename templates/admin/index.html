@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    .admin-actions { display:flex; gap:8px; margin-bottom:12px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:6px; border-bottom:1px solid #eee; text-align:left; font-size:13px; }
+    .small { font-size:12px; color:var(--muted); }
+    .btn { padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:#fff; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Admin Dashboard</h2>
+
+    <div class="admin-actions">
+      <form method="post" action="{{ url_for('admin_bp.clear_all') }}">
+        <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token','') }}">
+        <button class="btn" type="submit">Clear All Data</button>
+      </form>
+
+      <a class="btn" href="{{ url_for('admin_bp.export', which='data', admin_token=request.args.get('admin_token','')) }}">Export data.json</a>
+      <a class="btn" href="{{ url_for('admin_bp.export', which='hour', admin_token=request.args.get('admin_token','')) }}">Export hour.json</a>
+    </div>
+
+    <div>
+      <strong>Stats</strong>
+      <div class="small">Rounds: {{ stats.rounds }} — AA slots: {{ stats.hour_slots_aa }} — FourKind slots: {{ stats.hour_slots_fk }}</div>
+    </div>
+
+    <h3>Recent rounds (preview)</h3>
+    <table>
+      <thead><tr><th>ID</th><th>Card</th><th>Boxes</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for r in preview %}
+        <tr>
+          <td class="small">{{ r.round_id }}</td>
+          <td>{{ r.first_card }}</td>
+          <td>{{ r.selected_boxes | join(', ') }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin_bp.delete_round') }}" style="display:inline;">
+              <input type="hidden" name="round_id" value="{{ r.round_id }}">
+              <input type="hidden" name="admin_token" value="{{ request.args.get('admin_token','') }}">
+              <button class="btn" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
